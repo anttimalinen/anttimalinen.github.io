@@ -40,12 +40,12 @@ twitter:
 social:
   # Your real name, exactly as on your CV.
   # Displayed as the default author of posts and the copyright owner in the footer.
-  name: ""
-  email: ""
+  name: "Antti Malinen"
+  email: "temp"
   fediverse_handle:
-  links:
+  links: 
     # The first element serves as the copyright owner's link.
-    - ""
+    - "https://github.com/anttimalinen"
     # Uncomment when you want LinkedIn visible to employers:
     # - "https://www.linkedin.com/in/{your LinkedIn handle}"
 
