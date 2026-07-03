@@ -28,7 +28,7 @@ description: >- # used by seo meta and the atom feed
 
 # Fill in the protocol & hostname for your site.
 # Must match your repo name exactly. Note: no '/' at the end.
-url: "https://{anttimalinen}.github.io"
+url: "https://anttimalinen.github.io"
 
 github:
   username: "anttimalinen"
