@@ -1,9 +1,9 @@
 ---
-title: "Post foundation 1"
+title: "Post foundation 3"
 
-date: 2026-07-05 20:30 +0300
+date: 2026-07-06 18:00 +0300
 
-categories: [temp1]
+categories: [temp3]
 
 tags: [temp]
 
