@@ -5,7 +5,7 @@ date: 2026-07-05 20:30 +0300
 
 categories: [temp1]
 
-tags: [temp]
+tags: [temp1]
 
 description: "temp"
 
