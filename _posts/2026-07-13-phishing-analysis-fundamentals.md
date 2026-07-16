@@ -57,7 +57,6 @@ description: "How an email address, SMTP/POP3/IMAP delivery, and raw message hea
 
   Raw message source (Thunderbird: View > Message Source, or Ctrl+U) exposes what the inbox view hides: the originating IP address, the full header chain, and the raw body content behind whatever HTML or plain text the client renders.
 
-  [Screenshot placeholder: `email1.eml` raw message source with headers and `X-Originating-Ip` highlighted]
 
   Opening `email1.eml` this way surfaces the message's full subject line and the address listed under `X-Originating-Ip`. `[insert the observed subject line and IP here]`
 
@@ -73,7 +72,6 @@ description: "How an email address, SMTP/POP3/IMAP delivery, and raw message hea
 
   The base64 block following those headers is the file itself, decodable with CyberChef's From Base64 recipe or a dedicated base64-to-PDF converter.
 
-  [Screenshot placeholder: `email2.txt` attachment headers and base64 block]
 
   Working through `email2.txt` this way answers its attachment's `Content-Type`, its filename, and, once the base64 is decoded, a flag hidden inside the reconstructed file. `[insert the observed Content-Type, filename, and flag here]`
 
@@ -108,7 +106,7 @@ description: "How an email address, SMTP/POP3/IMAP delivery, and raw message hea
 
   CyberChef ships dedicated recipes for defanging both URLs and IP addresses.
 
-- **Step 8: put it together against `email3.eml`.** [Screenshot placeholder: `email3.eml` message source with spoofed sender, `X-Originating-IP`, and `Authentication-Results` header highlighted]
+- **Step 8: put it together against `email3.eml`.**
 
   This sample ties the whole room to one investigation: identifying which organization the message spoofs, pulling the real sender address out of the From header, defanging the `X-Originating-Ip` value before recording it, and reading the `Authentication-Results` header to see which mail server ran the authentication check. `[insert the observed spoofed organization, sender address, defanged IP, and mail server here]`
 

@@ -61,7 +61,6 @@ description: "How data leaves a compromised network through DNS tunneling, FTP, 
 
   In Splunk, the same investigation runs as a sequence of searches: `index=data_exfil sourcetype=DNS_logs` pulls the raw log set, `index="data_exfil" sourcetype="DNS_logs" | stats count by src_ip` shows which internal hosts are generating DNS traffic, `| stats count by query | sort -count` ranks the queries themselves, and `| where len(query) > 30` isolates the abnormally long ones.
 
-  [Screenshot placeholder: Wireshark DNS filter chain and Splunk stats-by-query search against `dns_exfil.pcap`]
 
   This investigation identified `tunnelcorp.net` as the domain receiving the tunneled traffic, 315 suspicious DNS logs tied to it, and `192.168.1.103` as the internal host sending the largest share of those requests.
 
@@ -76,7 +75,6 @@ description: "How data leaves a compromised network through DNS tunneling, FTP, 
 
   Working against `ftp-lab.pcap`, the filter chain isolates the investigation step by step: `ftp || ftp-data` pulls every FTP control and data packet, `ftp.request.command == "USER" || ftp.request.command == "PASS"` exposes login attempts and any weak or suspicious credentials, `ftp contains "STOR"` flags upload activity worth following as a TCP stream, and `ftp contains "csv"` narrows straight to file transfers involving spreadsheet data. A final pass with `ftp && frame.len > 90`, followed by Follow TCP Stream, exposes the content of the largest transfers directly.
 
-  [Screenshot placeholder: Follow TCP Stream output showing the exfiltrated CSV content in `ftp-lab.pcap`]
 
   This investigation found 5 connections from the guest account, a file named `customer_data.xlsx` exfiltrated from the root account, `192.168.1.105` as the internal IP sending the largest payload to an external address, and the flag `THM{ftp_exfil_hidden_flag}` inside the stream carrying the CSV transfer.
 
@@ -93,7 +91,6 @@ description: "How data leaves a compromised network through DNS tunneling, FTP, 
 
   Correlating that finding against `http_lab.pcap` in Wireshark follows the same narrowing pattern: `http` shows all HTTP traffic, `http.request.method == "POST"` isolates uploads, and `http.request.method == "POST" and frame.len > 500`, tightened further to `frame.len > 750`, cuts the noise down to the one request that matches what Splunk already flagged. Following that HTTP stream exposes the actual file content being sent out.
 
-  [Screenshot placeholder: Splunk table of POST requests by bytes_sent, next to the matching Wireshark HTTP stream]
 
   This investigation identified `192.168.1.103` as the compromised host used to exfiltrate the data, and the flag `THM{http_raw_3xf1ltr4t10n_succ3ss}` inside the exfiltrated content itself.
 
@@ -108,7 +105,6 @@ description: "How data leaves a compromised network through DNS tunneling, FTP, 
 
   Working against `icmp_lab.pcap`, three filters carry the investigation: `icmp` isolates all ICMP traffic, `icmp.type == 8` narrows to echo requests, and `icmp.type == 8 and frame.len > 100` flags the packets carrying payloads well past the ~74-byte size of a normal ping.
 
-  [Screenshot placeholder: Wireshark showing oversized ICMP echo request packets flagged by `frame.len > 100`]
 
   This investigation surfaced the flag `THM{1cmp_3ch0_3xf1ltr4t10n_succ3ss}` inside the oversized ICMP payloads.
 

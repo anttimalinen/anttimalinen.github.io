@@ -54,7 +54,7 @@ description: "What network traffic analysis is, why logs alone miss the content 
 | Port mirroring (SPAN) | A switch duplicates traffic from one port to a monitoring port in software | Can degrade performance under heavy load | Same idea works on virtual switches and cloud environments, like AWS VPC Traffic Mirroring |
 | NetFlow / IPFIX | Collects metadata about a traffic flow (source, destination, volume, duration) instead of full packets | Minimal | Built into most NGFWs, IDS, and IPS already. Effective for spotting C2 traffic, exfiltration, and lateral movement without storing every packet |
 
-- **Step 5: place the tap and read the traffic.** The room's exercise puts a small network topology on a static site and asks you to place a tap in the position that captures the traffic you need, then pull a flag out of HTTP traffic and a second flag out of DNS traffic. [Screenshot placeholder: tap placement and captured flags]
+- **Step 5: place the tap and read the traffic.** The room's exercise puts a small network topology on a static site and asks you to place a tap in the position that captures the traffic you need, then pull a flag out of HTTP traffic and a second flag out of DNS traffic.
 
 - **Step 6: know the tools built for this.** Wireshark and tcpdump handle full packet inspection. Snort, Suricata, and Zeek run as IDS/IPS engines that alert on patterns instead of requiring a human to read every packet.
 

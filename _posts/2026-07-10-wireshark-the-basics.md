@@ -97,7 +97,7 @@ description: "How Wireshark's GUI, packet dissection, navigation tools, and basi
 | Protocol port | `tcp.port == <port>` or `udp.port == <port>` | `tcp.port == 80` |
 | IP address | `ip.addr == <IP>` | `ip.addr == 192.168.1.2` |
 
-- **Step 6: run it against `Exercise.pcapng`.** [Screenshot placeholder: Exercise.pcapng loaded with Expert Info and Follow Stream open]
+- **Step 6: run it against `Exercise.pcapng`.** 
   - The capture file comment held the flag `TryHackMe_Wireshark_Demo`.
   - Total packet count: 58,620. SHA256 hash of the file: `f446de335565fb0b0ee5e5a3266703c778b2f3dfad7efeaeccb2da5641a6d6eb`.
   - A string search for `r4w` in packet details surfaced artist `r4w8173`.

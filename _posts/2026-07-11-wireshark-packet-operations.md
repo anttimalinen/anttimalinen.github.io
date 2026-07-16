@@ -131,7 +131,7 @@ description: "How Wireshark's Statistics menu, capture and display filter syntax
 
 - **Step 10: save the filters worth reusing.** Bookmarks and filter buttons both live on the filter toolbar. A bookmark saves a filter for recall from a dropdown. A filter button goes further, adding a labeled, clickable shortcut for a filter used often enough to deserve one click instead of a retype. Profiles solve a wider problem: switching between investigation cases usually means switching coloring rules and filter buttons too, and a profile bundles both into one saved configuration under Edit > Configuration Profiles, so working three cases in a day doesn't mean rebuilding the same setup three times.
 
-- **Step 11: run all of it against `Exercise.pcapng`.** [Screenshot placeholder: Statistics summary, filter toolbar, and a saved filter button applied to Exercise.pcapng]
+- **Step 11: run all of it against `Exercise.pcapng`.**
 
   Statistics summary findings:
   - The hostname starting with "bbc" resolved to 199.232.24.81.

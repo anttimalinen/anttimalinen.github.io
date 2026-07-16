@@ -67,7 +67,6 @@ description: "How NetworkMiner's host, session, DNS, credential, file, and anoma
 
 - **Step 3: tour the interface before opening a capture.** The File menu loads a pcap by browsing, dragging and dropping, or receiving one over IP. The Tools menu clears the dashboard and removes loaded data. The Help menu shows version and update information. The Case Panel, on the right side of the window, lists every loaded capture and lets an analyst reload, remove, or right-click a file to view its metadata (parsing time, data link layer type, and other capture-level details) through Show Metadata.
 
-  [Screenshot placeholder: Case Panel with a loaded pcap and the Show Metadata dialog open]
 
 - **Step 4: read the Hosts tab for identity and fingerprinting.** This tab lists every identified host in the capture along with IP address, MAC address, OS type, open ports, sent and received packet counts, and incoming/outgoing sessions. OS fingerprinting here depends on the Satori and p0f projects, and the MAC address database traces back to the mac-ages project. Hosts can be sorted and color-coded, and the right-click menu copies any selected value directly.
 
@@ -96,7 +95,7 @@ description: "How NetworkMiner's host, session, DNS, credential, file, and anoma
 | Extended parameter capture | Captures fewer parameters | Captures more parameters |
 | Single-tab cleartext data view | Available (can't be matched back to individual packets) | Not available |
 
-- **Step 9: run all of it against six real capture files.** [Screenshot placeholder: Hosts tab expanded for `mx-3.pcap` showing MAC address correlation]
+- **Step 9: run all of it against six real capture files.**
 
   **`mx-3.pcap`, host fingerprinting and MAC correlation:**
 
@@ -116,7 +115,6 @@ description: "How NetworkMiner's host, session, DNS, credential, file, and anoma
 
   This is an NTLMv2 authentication exchange captured off the wire, not a stored password. Cracking it (with Hashcat or John the Ripper) recovers the plaintext offline; the capture alone only proves the credential exchange happened.
 
-  [Screenshot placeholder: Credentials tab showing the extracted NTLMv2 hash for `02694W-WIN10`]
 
   **`mx-7.pcap` and `mx-9`, file carving, anomaly detection, and messages:**
 
@@ -129,7 +127,6 @@ description: "How NetworkMiner's host, session, DNS, credential, file, and anoma
 | Platform that sent the email starting "You have more..." | Facebook |
 | Email address of Branson Matheson | branson@sandsite.org |
 
-  [Screenshot placeholder: Anomalies tab showing the flagged TLS anomaly at frame 36255]
 
   **`case1.pcap`, cross-version host and session investigation:**
 
@@ -153,7 +150,6 @@ description: "How NetworkMiner's host, session, DNS, credential, file, and anoma
 | Password of homer.pwned.se@gmx.com | spring2015 |
 | DNS query of frame 62001 | pop.gmx.com |
 
-  [Screenshot placeholder: Files tab filtered for the USB product image in `case2.pcap`]
 
 ## Why it matters
 
