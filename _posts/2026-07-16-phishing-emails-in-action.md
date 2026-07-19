@@ -156,5 +156,3 @@ The tooling habit matters as much as the technical knowledge. Running a shortene
 - Template injection (`.dot`/`.dotm`) and LOLBin abuse (`regasms.exe`) both work by hiding malicious behavior behind a file type or process the system already trusts, which is why filename and file type alone are not enough for triage.
 - BCC delivery is a known spam and phishing signal on its own, independent of anything else in the message content.
 - Credential harvesting portals show a generic error regardless of whether the entered credentials were valid. It delays victim suspicion while the attacker already has what they needed.
-
-/stop-slop: Directness 10, Rhythm 9, Trust 10, Authenticity 9, Density 9. 47/50, converted 94/100.

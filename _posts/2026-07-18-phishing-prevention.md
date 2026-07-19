@@ -77,5 +77,3 @@ The `attachment.scr` case ties the whole room together. SPF, DKIM, and DMARC exi
 - S/MIME's digital signature and encryption solve different problems: one confirms identity and integrity, the other keeps content private, and only encryption satisfies confidentiality on its own.
 - SMTP response codes distinguish reputation-based blocks (5xx codes tied to sender history, like Spamhaus flags) from content-based ones, and treating them identically loses investigative detail.
 - File extension, not encoding, is what makes an attachment dangerous. Base64 is a legitimate, necessary transport mechanism regardless of what it carries.
-
-/stop-slop: Directness 9, Rhythm 8, Trust 9, Authenticity 9, Density 8. 43/50, converted 86/100.

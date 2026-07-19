@@ -172,5 +172,3 @@ PhishTool's role in this room is worth calling out on its own. Centralizing arti
 - A process reaching out to the network that has no legitimate reason to (`AcroRd32.exe` opening a connection, `svchost.exe` flagged for bad traffic) is a stronger signal than the file type alone.
 - CVE-2017-11882 remaining actively exploited nine years after patching is proof that unpatched legacy vulnerabilities stay relevant to real-world detection work.
 - Centralized platforms like PhishTool matter less for speed and more for the documentation trail they leave for whoever picks up the case next.
-
-/stop-slop: Directness 9, Rhythm 8, Trust 9, Authenticity 8, Density 8. 42/50, converted 84/100.
