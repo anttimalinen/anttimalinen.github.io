@@ -1,0 +1,107 @@
+---
+
+title: "Detecting Web Shells"
+
+date: 2026-07-22 12:00 +0300
+
+categories: [Foundations, Web Security]
+
+tags: [web-shells, soc, log-analysis, auditd, mitre-attack]
+
+description: "How web shells get deployed, why they evade typical connection-based detection, and the layered defense of logs, auditd, file system analysis, network traffic, and process monitoring that catches them, illustrated through ProxyLogon, ProxyShell, and a full WordPress compromise investigation."
+
+---
+
+## Description
+
+A web shell is a small script sitting on a compromised web server that gives an attacker remote command execution through nothing more than a web browser or a curl request. No malware binary lands on disk in the traditional sense, no process phones home to a command and control server on a schedule. The attacker just sends an HTTP request, the server runs it, and the response comes back through the same channel every other visitor uses. Microsoft reported tracking an average of 140,000 active web shells every month across the servers it monitors in 2021, and the technique hasn't slowed down since. CISA pushed an emergency directive to federal agencies in January 2024 after threat actors implanted web shells through a pair of Ivanti VPN vulnerabilities, which tells you this isn't a legacy problem someone solved a decade ago.
+
+This room covers the full detection lifecycle: what a web shell actually is under the hood, how it typically gets onto a server, and the layered set of techniques a SOC analyst or incident responder pulls from to find one, spanning web server logs, the Linux audit framework, file system forensics, and raw network traffic. It closes with a real investigation, tracing an attacker's full path through a compromised WordPress site using nothing but Apache access logs and a handful of `grep` commands.
+
+Source: TryHackMe, room "Detecting Web Shells."
+
+## The problem
+
+A web shell needs exactly one opening: a file upload feature that doesn't fully check what it's receiving. According to OWASP's File Upload Cheat Sheet, a properly secured upload path validates the file extension against an allowlist, checks the actual file signature rather than trusting the browser-supplied Content-Type header (which is trivial to spoof), renames the file server-side instead of trusting the client's filename, and stores the result somewhere the web server won't execute it as a script. Skip any one of those checks and an attacker can disguise a malicious script as an image or document and get code execution on the server.
+
+Once that script lands, it doesn't look like malware to anything watching for suspicious binaries. It rides on functions the application framework ships with. In PHP that means `shell_exec()`, `exec()`, `system()`, and `passthru()`, all legitimate functions with legitimate uses that happen to also run arbitrary system commands when an attacker controls the input. From the server's point of view, a web shell request is just the application doing what web applications do: take a parameter, process it, return a response.
+
+**Why connection-based detection fails here.** Most persistence mechanisms, remote access trojans, backdoors, implants, periodically call out to attacker-controlled infrastructure, which gives defenders a beacon pattern to hunt for in network traffic. A web shell flips that model. It only activates when the attacker sends it a request, so there's no outbound connection to catch, no regular beacon interval, nothing calling home on its own. MITRE ATT&CK classifies this under T1505.003, Server Software Component: Web Shell, filed in the Persistence tactic, and specifically calls out that unlike other forms of persistent remote access, web shells don't initiate connections, and the server-side payload can be small enough to blend into a directory full of legitimate application files. That combination, silent until triggered and easy to disguise, is what makes them a favorite for keeping access alive long after the original vulnerability that let the attacker in gets patched.
+
+**The size and capability spectrum runs wide.** Some web shells are a single line of code. China Chopper, one of the most widely deployed web shells in APT operations since it was first documented in 2012, fits its entire server-side payload into roughly 4 kilobytes and pairs it with a full graphical client (`caidao.exe`) that gives the operator file management, database tools, and a built-in brute-force module, all driven by a single obfuscated function call sitting server-side. Other frameworks go further still:
+
+| Shell / framework | Rough tier | Notable capability |
+|---|---|---|
+| China Chopper | Minimalist | Full GUI client, sub-5KB server payload, file and DB management |
+| Weevely | Mid-tier | 30+ modules, obfuscated request traffic, agent-style management |
+| WSO / c99 / r57 | Full-featured | File explorer, DB browser, network tools, self-contained PHP |
+| ASPXSpy / SharPyShell / Krypton | Platform-specific | Built for IIS/.NET environments, used by both criminal and state-linked actors |
+
+  The takeaway for detection: assuming a web shell will "look like malware" is the wrong mental model. Some are indistinguishable from a single misplaced line in a legitimate file.
+
+**Two real intrusions show how this plays out at scale.** In the ProxyLogon campaign, the Hafnium threat group chained four Microsoft Exchange vulnerabilities: CVE-2021-26855, a server-side request forgery (SSRF) flaw letting an unauthenticated attacker send arbitrary requests and authenticate as the Exchange server itself; CVE-2021-26857, an insecure deserialization bug in the Unified Messaging service giving code execution as SYSTEM; and CVE-2021-26858 and CVE-2021-27065, both post-authentication arbitrary file write vulnerabilities that let the attacker drop a file to any path on the server once authenticated. Volexity traced exploitation back to January 3, 2021, researcher Orange Tsai and DEVCORE disclosed related flaws to Microsoft two days later, and by late February the activity had gone from targeted to global as Hafnium raced to backdoor as many vulnerable servers as possible before Microsoft's March 2 emergency patch closed the door. Hafnium's tool of choice was a JScript variant of China Chopper, dropped into directories like `\inetpub\wwwroot\aspnet_client\` and the OWA authentication path, giving them remote command execution behind nothing more than an HTTP POST to a `.aspx` file whose location was the only thing the attacker needed to know.
+
+Conti's ransomware affiliates followed a near-identical playbook against a different Exchange vulnerability chain, ProxyShell (CVE-2021-34473, CVE-2021-34523, CVE-2021-31207), and moved dramatically faster. Sophos's incident response team documented an attack where a web shell named `aspnetclient_log.aspx` landed in that same `\aspnet_client\` directory Hafnium had used months earlier. Three minutes after that shell went live, the attacker issued their first command through it, a base64-encoded PowerShell `whoami` call to confirm which account they were now running as. Within roughly thirty minutes they had enumerated every computer, domain controller, and domain administrator account on the network. Within four hours they held domain administrator credentials and were executing commands with full reach across the environment. That compression, from initial web shell to domain-wide compromise in a single afternoon, is the reason detection speed matters as much as detection accuracy for this technique.
+
+This isn't a 2021 problem either. In January 2024, Volexity identified threat actors chaining CVE-2023-46805 and CVE-2024-21887 in Ivanti Connect Secure and Ivanti Policy Secure gateways to achieve unauthenticated remote code execution, then implanting web shells tracked as GLASSTOKEN and GIFTEDVISITOR on both internal and external-facing servers, the exact same T1505.003 technique the room covers, running against edge infrastructure three years after ProxyLogon made headlines.
+
+## How it works
+
+Detection here isn't one tool doing one job. It's several overlapping views of the same activity, each catching what the others miss.
+
+- **Step 1: read web server access logs for behavioral outliers.** Every request logs a client IP, timestamp, HTTP method, requested resource, response code, user agent, and referrer. None of those fields is suspicious in isolation. The combination is what stands out:
+
+| Indicator | What to look for |
+|---|---|
+| HTTP method | Repeated `GET` requests probing for a valid upload path, followed by a `POST` to that path |
+| User agent | Altered strings (`Mozilla/4.0` with nothing after it), outdated browsers, or bare tool signatures like `curl/1.XX.X` |
+| IP address | Traffic from an address outside the network's normal range hitting internal-only endpoints |
+| Query string | Long or encoded strings, especially containing `cmd=` or `exec=` |
+| Referrer | Missing entirely, meaning the page was hit directly rather than navigated to (not conclusive alone) |
+
+  A believable attack sequence looks like repeated `GET` requests to an upload directory returning `404`, a `POST` that succeeds where those failed, then further `GET` requests to the uploaded file carrying a `cmd=` parameter. Same IP and same user agent run through the whole chain.
+
+- **Step 2: configure `auditd` to catch the write the moment it happens.** `auditd` is the userspace component of the Linux Audit framework, a kernel-level logging system that records exactly what happened on a system rather than what an application chose to report. It's controlled through `auditctl`, and the basic rule syntax is `auditctl -w /path/to/watch -p permissions -k key_name`. The `-p` flag takes any combination of `r` (read), `w` (write), `x` (execute), and `a` (attribute change), and `-k` attaches an arbitrary label so matching events are easy to search for later. A rule like `auditctl -w /var/www/html -p wa -k web_uploads` tells the kernel to log any write or attribute change under the web root, tagged with the key `web_uploads`. Rules added this way disappear on reboot unless they're also saved into a file under `/etc/audit/rules.d/` and loaded with `augenrules --load`, so a production deployment needs both steps. Once the rule is active, running `ausearch -k web_shell` pulls every matching event, including the exact file path touched and the account or process responsible. A `creat` syscall entry timestamped seconds after a suspicious `POST` confirms that request actually wrote a file to disk, not just returned a success response.
+
+- **Step 3: correlate logs and audit trail into one timeline.** Neither source alone proves an incident. A `POST` to `/upload.php` in the access log is circumstantial. An `auditd` entry showing `creat` on a new `.php` file seconds later turns it into confirmed evidence. A SIEM (Security Information and Event Management platform) earns its place here by centralizing both log types and letting an analyst query across them instead of manually lining up timestamps by hand across two separate tools.
+
+- **Step 4: search the file system directly for the shell itself.** Default web root directories are a known starting point: `/var/www/html/` on most Apache installs, `/usr/share/nginx/html/` on Nginx. A custom root path doesn't fully hide this either, since attackers scan or guess common upload paths like `/uploads/`, `/images/`, or `/admin/`. The NSA's joint guidance with the Australian Signals Directorate identifies the single most effective detection method as comparing production files against a known-good baseline, typically a fresh install of the same application with all available updates applied, since a diff surfaces anything an attacker added or modified far more reliably than eyeballing file names. Two other things flag a malicious file fast: a name that doesn't match anything else the application generates, and a double extension like `image.jpg.php` designed to slip past a careless type check. `find /var/www/ -type f -name "*.php"` narrows a search by extension and modification date, and `grep -r "eval("` catches suspicious function calls buried in otherwise normal-looking files.
+  - One exception worth knowing: platforms like WordPress and Django store page content in a database rather than flat files, so a payload injected into a post, theme, or setting won't turn up in a file system search at all.
+  - Beyond manual `find` and `grep`, purpose-built scanners exist specifically for this problem. YARA, a pattern-matching engine created at VirusTotal in 2007, lets analysts write signature rules that match known web shell code structures, obfuscation patterns, or specific function combinations, and tools like LOKI, NeoPI, PHP-malware-finder, and Web Shell Detector wrap YARA-style scanning into ready-to-run utilities that crawl a file system and flag matches automatically. Recorded Future's 2021 research into five actively used web shells, Alfa, SharPyShell, Krypton, ASPXSpy, and TWOFACE, combined YARA rules, Sigma rules (a SIEM-agnostic detection rule format), network traffic patterns, and internet-wide scanning into one methodology, on the reasoning that no single technique catches everything a determined operator deploys.
+
+- **Step 5: inspect raw network traffic when logs and files aren't enough.** A packet capture shows full request and response bodies, which means a `POST /upload.php` request can reveal an entire web shell's source code sitting in the payload, uploaded in plain sight. China Chopper's traffic pattern is a well-documented example: the client communicates over TCP using HTTP `POST` requests, generating one POST per command issued, with distinctive base64-encoded command strings in the request body, a pattern security researchers have used for years to fingerprint the shell purely from wire traffic. That detection breaks down the moment the web shell sits behind TLS, since encryption hides the payload from anyone without the private key or a decryption point inline. Wireshark filters narrow the hunt when traffic is available in the clear: `http.request.method == "PUT"` isolates upload attempts, `http.request.uri contains ".php"` surfaces requests to script files, and `http.user_agent` flags a client identifying itself oddly.
+
+- **Step 6: watch for anomalous process trees, not just files.** A web server process has no legitimate reason to spawn a command shell, `whoami`, `net.exe`, or `ipconfig`, yet that's precisely what happens the instant an attacker sends a command through a live web shell. Sysmon Event ID 1 on Windows and `auditd`'s `execve` syscall monitoring on Linux (added with a rule like `-a always,exit -S execve -k process_exec`) both capture process creation events, including the parent process that spawned them. The NSA's web shell mitigation guide specifically recommends watching for a web server binary such as `w3wp.exe`, `httpd`, or `nginx` appearing as the parent of a shell or system utility, since that parent-child relationship is difficult for an attacker to hide and rarely happens for any legitimate reason.
+
+- **Step 7: work an actual case end to end.** The room's investigation task hands over Apache access logs from a compromised WordPress site, `/var/log/apache2/access.log`, with no other context. Filtering for response codes with `grep "404"` and narrowing by IP builds a profile of the attacker one request at a time.
+
+| Finding | Answer |
+|---|---|
+| Attacker IP address | `203.0.113.66` |
+| First directory successfully identified | `/wordpress` |
+| Upload endpoint abused | `upload_form.php` |
+| First command run through the shell | `whoami` |
+| Second file downloaded post-compromise | `linpeas.sh` |
+| Flag hidden in the shell's own source | `THM{W3b_Sh3ll_Int3rnals}` |
+
+  `linpeas.sh` is a privilege escalation enumeration script, and its presence confirms the attacker moved straight from initial access into reconnaissance for further compromise the moment the shell gave them a foothold. Reading the uploaded shell's own code with `cat` turned up the hidden flag inside the script itself, separate from the earlier hands-on flag found in Task 3's lab environment, `THM{W3b_Sh3ll_Usag3}`, which came from listing directory contents on the initial web shell demo running as the `www-data` user.
+
+## Why it matters
+
+Web shells rarely announce themselves with a single alert. They show up as a pattern spread across sources that individually look like noise: a few `404` responses, an odd user agent, a file with a modification date that doesn't match any deployment window, a web server process briefly spawning `whoami`. An analyst checking only one data source misses that pattern, and the ProxyLogon and ProxyShell cases both show real attackers counting on exactly that gap. Cross-referencing web logs, `auditd`, the file system, network traffic, and process behavior together is what actually catches this class of attack, and the same layered thinking generalizes to detecting persistence mechanisms beyond just this one technique.
+
+The T1505.003 classification carries an operational lesson too: a web shell is a symptom, not the root cause. Finding one on a server means the vulnerability that let it get uploaded, whether a missing extension check, a chained authentication bypass, or an unpatched CVE, is still open. Deleting the file without closing that gap just means the same attacker, or the next opportunist scanning for the same weakness, walks back in through the identical door. That's why the OWASP File Upload Cheat Sheet controls matter as much as detection skill: allowlisting file extensions instead of blocking known-bad ones, validating the actual file signature rather than trusting a spoofable Content-Type header, renaming uploaded files server-side so an attacker can't choose where their payload lands, and storing uploads outside the web root or in a location where script execution is disabled entirely. Any one of those, applied consistently, removes the opening a web shell needs in the first place.
+
+The Conti timeline is worth sitting with too. Three minutes from web shell to first command, thirty minutes to a full network map, four hours to domain administrator credentials. Detection that takes days to notice an intrusion is detection that arrives long after the damage is done. And this isn't a solved problem from a few years ago: CISA's January 2024 emergency directive over the Ivanti Connect Secure exploitation chain shows the exact same technique, the exact same MITRE sub-technique, still landing on edge devices and VPN gateways today. CISA has noted that a zero-trust security posture, which treats every request as untrusted regardless of network location, can deter web shell attacks generally, but explicitly still advises agencies to stay watchful rather than treat zero trust as a substitute for active detection.
+
+For a SOC analyst or incident responder, this room maps directly onto day-to-day work: reading access logs for anomalies, correlating multiple log sources into a single timeline, running file system forensics, and knowing when to reach for a packet capture instead of a log line. None of those skills are unique to web shells, but web shells are one of the cleanest ways to practice all of them together against a single, well-understood technique.
+
+## Key takeaways
+
+- A web shell abuses legitimate server-side execution functions to give an attacker remote command execution, typically delivered through a file upload vulnerability, and classified under MITRE ATT&CK T1505.003, Persistence.
+- Web shells don't initiate outbound connections the way traditional backdoors do, which is why connection-based network detection alone misses them; detection has to look inbound, at logs, files, processes, and traffic content, rather than outbound at beacon patterns.
+- No single log source proves a web shell incident on its own. Web access logs suggest it, `auditd` confirms the file write and can also catch the process execution that follows, file system searches locate the payload, and packet captures can expose the full source code in transit when traffic isn't encrypted.
+- WordPress and Django store content in a database, so file system searches alone can miss a web shell injected through a post, theme, or setting rather than uploaded as a standalone file.
+- Real intrusions compress fast: Conti's affiliates went from web shell to domain administrator credentials in about four hours, and the same T1505.003 technique used in 2021's ProxyLogon campaign was still landing on Ivanti VPN gateways in January 2024.
+- Finding a web shell only solves half the problem. Closing the file upload gap that let it in, through extension allowlisting, file signature validation, server-side renaming, and disabling script execution in upload directories, is what stops the same door from reopening.
+- Working the WordPress investigation traced a full attack chain from the first identified directory (`/wordpress`) through the upload vector (`upload_form.php`), the first executed command (`whoami`), and a downloaded privilege escalation tool (`linpeas.sh`), ending with a flag hidden inside the shell's own source code.
